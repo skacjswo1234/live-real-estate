@@ -136,7 +136,7 @@
 
     <script>
         // 카카오맵 API 키 설정
-        const KAKAO_API_KEY = 'de244919a65ce3e6904d2c5893a4e82a';
+        const KAKAO_API_KEY = '3bb53901127a0dc129ccb44d96c97a85';
         
         let map;
         let markers = [];
@@ -168,22 +168,35 @@
                     return;
                 }
 
+                // 현재 도메인 확인
+                const currentUrl = window.location.origin;
+                console.log('현재 접속 URL:', currentUrl);
+
                 // 스크립트 태그 생성
                 const script = document.createElement('script');
                 script.type = 'text/javascript';
-                script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_API_KEY}`;
+                // 프로토콜 명시적으로 지정
+                const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+                script.src = `${protocol}//dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_API_KEY}`;
                 script.async = true;
                 
                 script.onload = () => {
-                    if (typeof kakao !== 'undefined' && kakao.maps) {
-                        resolve();
-                    } else {
-                        reject(new Error('카카오맵 API를 불러올 수 없습니다.'));
-                    }
+                    // 약간의 지연 후 확인 (API 초기화 시간 필요)
+                    setTimeout(() => {
+                        if (typeof kakao !== 'undefined' && kakao.maps) {
+                            console.log('카카오맵 API 로드 성공');
+                            resolve();
+                        } else {
+                            reject(new Error('카카오맵 API 객체를 찾을 수 없습니다.'));
+                        }
+                    }, 100);
                 };
                 
-                script.onerror = () => {
-                    reject(new Error('카카오맵 스크립트를 로드할 수 없습니다. 플랫폼 설정을 확인해주세요.'));
+                script.onerror = (error) => {
+                    console.error('카카오맵 스크립트 로드 실패:', error);
+                    console.error('현재 도메인:', currentUrl);
+                    console.error('등록 필요 도메인:', currentUrl);
+                    reject(new Error(`카카오맵 스크립트를 로드할 수 없습니다.\n\n현재 도메인: ${currentUrl}\n\n카카오 개발자 콘솔에서 다음 도메인을 플랫폼에 등록해주세요:\n1. https://developers.kakao.com 접속\n2. 내 애플리케이션 > 앱 설정 > 플랫폼\n3. Web 플랫폼 등록\n4. 사이트 도메인: ${currentUrl}`));
                 };
                 
                 document.head.appendChild(script);
@@ -196,8 +209,9 @@
                 await loadKakaoMapScript();
                 initMap();
             } catch (error) {
-                console.error(error.message);
-                alert('카카오맵을 불러올 수 없습니다.\n\n카카오 개발자 콘솔에서 플랫폼 설정을 확인해주세요:\n1. https://developers.kakao.com 접속\n2. 내 애플리케이션 > 앱 설정 > 플랫폼\n3. Web 플랫폼 등록\n4. 사이트 도메인: http://localhost 또는 http://127.0.0.1');
+                console.error('카카오맵 초기화 실패:', error);
+                const currentUrl = window.location.origin;
+                alert(`카카오맵을 불러올 수 없습니다.\n\n에러: ${error.message}\n\n현재 도메인: ${currentUrl}\n\n카카오 개발자 콘솔에서 플랫폼 설정을 확인해주세요:\n1. https://developers.kakao.com 접속\n2. 내 애플리케이션 > 앱 설정 > 플랫폼\n3. Web 플랫폼 등록\n4. 사이트 도메인에 "${currentUrl}" 정확히 등록\n5. 저장 후 2-3분 대기`);
             }
         };
 
