@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>부동산 매물 지도</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Malgun Gothic', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+            position: relative;
+        }
+
+        .map-container {
+            flex: 7;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 지도 상단 검색 조건 패널 (왼쪽 지도 상단) */
+        .map-search-panel {
+            background: white;
+            border-radius: 0;
+            padding: 10px 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .map-search-panel h3 {
+            color: #333;
+            font-size: 0.95em;
+            margin-bottom: 10px;
+            font-weight: 600;
+            display: none; /* 제목 숨김 */
+        }
+        
+        .map-search-content {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        #map {
+            flex: 1;
+            height: 100%;
+            position: relative;
+        }
+
+        .sidebar {
+            flex: 3;
+            height: 100vh;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar h2 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.3em;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .region-list {
+            list-style: none;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .region-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid #e0e0e0;
+            color: #333;
+        }
+
+        .region-item:hover {
+            background: #f0f0f0;
+            border-color: #FFE500;
+            transform: translateX(-3px);
+        }
+
+        .region-item.active {
+            background: #FFE500;
+            color: #333;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(255, 229, 0, 0.3);
+            border-color: #FFE500;
+        }
+
+        .property-count {
+            color: #666;
+            font-size: 0.85em;
+            margin-left: 5px;
+            font-weight: normal;
+        }
+
+        .search-group {
+            margin-bottom: 0;
+            flex: 0 0 auto;
+            min-width: 120px;
+        }
+
+        .search-group label {
+            display: none; /* 라벨 숨김 */
+        }
+
+        .search-group select {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85em;
+            transition: all 0.3s;
+            background: #fff;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .search-group select:focus {
+            outline: none;
+            border-color: #FFE500;
+            box-shadow: 0 0 0 2px rgba(255, 229, 0, 0.1);
+        }
+
+
+        .property-list {
+            margin-top: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .property-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .property-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+            border-color: #FFE500;
+        }
+
+        .property-card.active {
+            border-color: #FFE500;
+            background: #fffef0;
+            box-shadow: 0 4px 12px rgba(255, 229, 0, 0.3);
+        }
+
+        .property-card h4 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .property-card .price {
+            color: #FF6B6B;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 8px;
+        }
+
+        .property-card .info {
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .property-card .info span {
+            margin-right: 10px;
+        }
+
+        .property-detail {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            max-width: calc(100vw - 40px);
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 1001;
+        }
+
+        .property-detail.show {
+            display: block;
+        }
+
+        .property-detail h3 {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 1.2em;
+        }
+
+        .property-detail .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+
+        .property-detail .close-btn:hover {
+            background: #f0f0f0;
+        }
+
+        .property-info {
+            margin-top: 15px;
+        }
+
+        .property-info p {
+            margin: 8px 0;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .property-info .price {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #FF6B6B;
+            margin-bottom: 10px;
+        }
+
+        /* 모바일 반응형 */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .map-container {
+                flex: 0 0 auto;
+                height: auto;
+            }
+            
+            .map-search-panel {
+                padding: 8px 10px;
+                max-height: 50vh;
+                overflow-y: auto;
+            }
+            
+            .map-search-content {
+                flex-direction: row;
+                gap: 6px;
+                flex-wrap: wrap;
+            }
+            
+            .search-group {
+                flex: 1 1 calc(50% - 3px);
+                min-width: calc(50% - 3px);
+                max-width: calc(50% - 3px);
+            }
+            
+            .search-group select {
+                padding: 5px 8px;
+                font-size: 0.8em;
+            }
+            
+
+            #map {
+                height: 50vh;
+                min-height: 50vh;
+            }
+
+            .sidebar {
+                flex: 1;
+                height: 50vh;
+                min-height: 50vh;
+                max-height: 50vh;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+                position: relative;
+                overflow-y: auto;
+            }
+
+            .sidebar h2 {
+                font-size: 1.1em;
+                margin-bottom: 12px;
+                cursor: pointer;
+            }
+
+            .property-detail {
+                width: calc(100vw - 40px);
+                right: 20px;
+                left: 20px;
+                bottom: calc(50vh + 20px);
+                max-height: 30vh;
+                overflow-y: auto;
+            }
+
+            .region-item {
+                padding: 10px;
+                font-size: 0.85em;
+                margin-bottom: 8px;
+            }
+
+            .property-card {
+                padding: 12px;
+                margin-bottom: 12px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .map-search-panel {
+                padding: 6px 8px;
+                max-height: 45vh;
+            }
+            
+            .map-search-content {
+                gap: 5px;
+            }
+            
+            .search-group {
+                flex: 1 1 calc(50% - 2.5px);
+                min-width: calc(50% - 2.5px);
+                max-width: calc(50% - 2.5px);
+            }
+            
+            .search-group select {
+                padding: 4px 6px;
+                font-size: 0.75em;
+            }
+            
+            #map {
+                height: 45vh;
+                min-height: 45vh;
+            }
+            
+            .sidebar {
+                height: 55vh;
+                min-height: 55vh;
+                max-height: 55vh;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #map {
+                height: 50vh;
+            }
+
+            .sidebar {
+                height: 50vh;
+                max-height: 50vh;
+                padding: 15px;
+            }
+
+            .sidebar h2 {
+                font-size: 1.1em;
+            }
+
+            .property-detail {
+                padding: 15px;
+                bottom: calc(50vh + 20px);
+                max-height: 25vh;
+            }
+
+            .property-info .price {
+                font-size: 1.3em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 왼쪽: 지도 영역 -->
+        <div class="map-container">
+            <!-- 지도 상단 검색 조건 패널 -->
+            <div class="map-search-panel">
+                <h3>상가 검색</h3>
+                <div class="map-search-content">
+                    <div class="search-group">
+                        <label>상가 유형</label>
+                        <select id="propertyType" onchange="applyFilters()">
+                            <option value="">전체</option>
+                            <option value="상가">상가</option>
+                            <option value="원룸">원룸</option>
+                            <option value="오피스텔">오피스텔</option>
+                            <option value="아파트">아파트</option>
+                        </select>
+                    </div>
+                    
+                    <div class="search-group">
+                        <label>최소 가격</label>
+                        <select id="minPrice" onchange="applyFilters()">
+                            <option value="">전체</option>
+                            <option value="1">1억원 이상</option>
+                            <option value="2">2억원 이상</option>
+                            <option value="3">3억원 이상</option>
+                            <option value="5">5억원 이상</option>
+                            <option value="10">10억원 이상</option>
+                            <option value="20">20억원 이상</option>
+                            <option value="30">30억원 이상</option>
+                            <option value="50">50억원 이상</option>
+                        </select>
+                    </div>
+                    
+                    <div class="search-group">
+                        <label>최대 가격</label>
+                        <select id="maxPrice" onchange="applyFilters()">
+                            <option value="">전체</option>
+                            <option value="2">2억원 이하</option>
+                            <option value="3">3억원 이하</option>
+                            <option value="5">5억원 이하</option>
+                            <option value="10">10억원 이하</option>
+                            <option value="20">20억원 이하</option>
+                            <option value="30">30억원 이하</option>
+                            <option value="50">50억원 이하</option>
+                            <option value="100">100억원 이하</option>
+                        </select>
+                    </div>
+                    
+                    <div class="search-group">
+                        <label>최소 면적</label>
+                        <select id="minArea" onchange="applyFilters()">
+                            <option value="">전체</option>
+                            <option value="10">10㎡ 이상</option>
+                            <option value="20">20㎡ 이상</option>
+                            <option value="30">30㎡ 이상</option>
+                            <option value="50">50㎡ 이상</option>
+                            <option value="80">80㎡ 이상</option>
+                            <option value="100">100㎡ 이상</option>
+                            <option value="150">150㎡ 이상</option>
+                            <option value="200">200㎡ 이상</option>
+                        </select>
+                    </div>
+                    
+                    <div class="search-group">
+                        <label>최대 면적</label>
+                        <select id="maxArea" onchange="applyFilters()">
+                            <option value="">전체</option>
+                            <option value="20">20㎡ 이하</option>
+                            <option value="30">30㎡ 이하</option>
+                            <option value="50">50㎡ 이하</option>
+                            <option value="80">80㎡ 이하</option>
+                            <option value="100">100㎡ 이하</option>
+                            <option value="150">150㎡ 이하</option>
+                            <option value="200">200㎡ 이하</option>
+                            <option value="300">300㎡ 이하</option>
+                            <option value="500">500㎡ 이하</option>
+                        </select>
+                    </div>
+                    
+                    <div class="search-group">
+                        <label>지역</label>
+                        <select id="regionFilter" onchange="applyFilters()">
+                            <option value="">전체 지역</option>
+                            <!-- 동적으로 생성됨 -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 지도 -->
+            <div id="map"></div>
+        </div>
+
+        <!-- 오른쪽: 매물 리스트 -->
+        <div class="sidebar" id="sidebar">
+            <h2>상가 매물</h2>
+            
+            <ul class="region-list" id="regionList">
+                <!-- 동적으로 생성됨 -->
+            </ul>
+            
+            <!-- 매물 리스트 -->
+            <div class="property-list" id="propertyList">
+                <!-- 동적으로 생성됨 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 매물 상세 정보 -->
+    <div class="property-detail" id="propertyDetail">
+        <button class="close-btn" onclick="closePropertyDetail()">&times;</button>
+        <h3 id="propertyTitle"></h3>
+        <div class="property-info" id="propertyInfo"></div>
+    </div>
+
+    <script>
+        // 카카오맵 API 키 설정
+        const KAKAO_API_KEY = '3bb53901127a0dc129ccb44d96c97a85';
+        
+        let map;
+        let markers = [];
+        let regionOverlays = []; // 구별 동그라미 오버레이
+        let currentRegion = null;
+        let propertyData = [];
+
+        // 상가 매물 데이터 예시 (부산: 연산동, 우동, 좌동 각 1개씩)
+        const sampleProperties = [
+            { id: 1, name: '연산동 상가', region: '연산동', address: '부산광역시 연제구 연산동', price: '12억원', priceValue: 12, type: '상가', area: '120㎡', areaValue: 120, lat: 35.1820, lng: 129.0850 },
+            { id: 2, name: '우동 상가', region: '우동', address: '부산광역시 해운대구 우동', price: '8억원', priceValue: 8, type: '상가', area: '80㎡', areaValue: 80, lat: 35.1631, lng: 129.1636 },
+            { id: 3, name: '좌동 상가', region: '좌동', address: '부산광역시 해운대구 좌동', price: '15억원', priceValue: 15, type: '상가', area: '150㎡', areaValue: 150, lat: 35.1700, lng: 129.1700 }
+        ];
+        
+        // 가격 문자열을 숫자로 변환하는 함수
+        function parsePrice(priceStr) {
+            if (!priceStr) return 0;
+            // "3억 5천만원" -> 3.5
+            const match = priceStr.match(/(\d+(?:\.\d+)?)\s*억/);
+            if (match) {
+                const eok = parseFloat(match[1]);
+                const cheonMatch = priceStr.match(/(\d+(?:\.\d+)?)\s*천만원/);
+                if (cheonMatch) {
+                    return eok + parseFloat(cheonMatch[1]) * 0.1;
+                }
+                return eok;
+            }
+            // "1억 2천만원" 같은 경우
+            const cheonMatch = priceStr.match(/(\d+(?:\.\d+)?)\s*천만원/);
+            if (cheonMatch) {
+                return parseFloat(cheonMatch[1]) * 0.1;
+            }
+            return 0;
+        }
+        
+        // 면적 문자열을 숫자로 변환하는 함수
+        function parseArea(areaStr) {
+            if (!areaStr) return 0;
+            const match = areaStr.match(/(\d+(?:\.\d+)?)/);
+            return match ? parseFloat(match[1]) : 0;
+        }
+        
+        // 검색 필터 적용
+        function applyFilters() {
+            // 필터 값 가져오기
+            currentFilters.type = document.getElementById('propertyType').value;
+            currentFilters.region = document.getElementById('regionFilter').value;
+            const minPriceVal = document.getElementById('minPrice').value;
+            const maxPriceVal = document.getElementById('maxPrice').value;
+            const minAreaVal = document.getElementById('minArea').value;
+            const maxAreaVal = document.getElementById('maxArea').value;
+            
+            currentFilters.minPrice = minPriceVal ? parseFloat(minPriceVal) : null;
+            currentFilters.maxPrice = maxPriceVal ? parseFloat(maxPriceVal) : null;
+            currentFilters.minArea = minAreaVal ? parseFloat(minAreaVal) : null;
+            currentFilters.maxArea = maxAreaVal ? parseFloat(maxAreaVal) : null;
+            
+            // 지역 필터가 선택되면 currentRegion 업데이트
+            if (currentFilters.region) {
+                currentRegion = currentFilters.region;
+            } else {
+                currentRegion = null;
+            }
+            
+            // 필터링 적용
+            let filtered = propertyData.filter(property => {
+                // 타입 필터
+                if (currentFilters.type && property.type !== currentFilters.type) {
+                    return false;
+                }
+                
+                // 지역 필터
+                if (currentFilters.region && property.region !== currentFilters.region) {
+                    return false;
+                }
+                
+                // 가격 필터
+                const priceValue = property.priceValue || parsePrice(property.price);
+                if (currentFilters.minPrice !== null && priceValue < currentFilters.minPrice) {
+                    return false;
+                }
+                if (currentFilters.maxPrice !== null && priceValue > currentFilters.maxPrice) {
+                    return false;
+                }
+                
+                // 면적 필터
+                const areaValue = property.areaValue || parseArea(property.area);
+                if (currentFilters.minArea !== null && areaValue < currentFilters.minArea) {
+                    return false;
+                }
+                if (currentFilters.maxArea !== null && areaValue > currentFilters.maxArea) {
+                    return false;
+                }
+                
+                return true;
+            });
+            
+            filteredProperties = filtered;
+            
+            // 지도 업데이트
+            clearMarkers();
+            clearRegionCircles();
+            
+            if (filtered.length > 0) {
+                displayProperties(filtered);
+                const regionGroups = groupByRegion(filtered);
+                displayRegionCircles(regionGroups);
+                renderPropertyList(filtered);
+                
+                // 지역 목록 활성화 업데이트
+                updateRegionListActive();
+                
+                // 지도 중심 이동
+                const bounds = new kakao.maps.LatLngBounds();
+                filtered.forEach(property => {
+                    bounds.extend(new kakao.maps.LatLng(property.lat, property.lng));
+                });
+                map.setBounds(bounds, 100);
+            } else {
+                renderPropertyList([]);
+                alert('검색 조건에 맞는 상가 매물이 없습니다.');
+            }
+        }
+        
+        // 지역 목록 활성화 업데이트
+        function updateRegionListActive() {
+            document.querySelectorAll('.region-item').forEach(item => {
+                item.classList.remove('active');
+                const itemRegion = item.getAttribute('data-region');
+                if (currentRegion === null && itemRegion === 'all') {
+                    item.classList.add('active');
+                } else if (currentRegion !== null && itemRegion === currentRegion) {
+                    item.classList.add('active');
+                }
+            });
+        }
+        
+        // 필터 초기화
+        function resetFilters() {
+            document.getElementById('propertyType').selectedIndex = 0;
+            document.getElementById('regionFilter').selectedIndex = 0;
+            document.getElementById('minPrice').selectedIndex = 0;
+            document.getElementById('maxPrice').selectedIndex = 0;
+            document.getElementById('minArea').selectedIndex = 0;
+            document.getElementById('maxArea').selectedIndex = 0;
+            
+            currentFilters = {
+                type: '',
+                minPrice: null,
+                maxPrice: null,
+                minArea: null,
+                maxArea: null,
+                region: ''
+            };
+            
+            // 전체 매물 표시
+            filteredProperties = propertyData;
+            currentRegion = null;
+            
+            clearMarkers();
+            clearRegionCircles();
+            
+            displayProperties(propertyData);
+            const regionGroups = groupByRegion(propertyData);
+            displayRegionCircles(regionGroups);
+            renderPropertyList(propertyData);
+            
+            // 지역 목록 활성화 초기화
+            updateRegionListActive();
+            
+            // 지도 중심 이동
+            const bounds = new kakao.maps.LatLngBounds();
+            propertyData.forEach(property => {
+                bounds.extend(new kakao.maps.LatLng(property.lat, property.lng));
+            });
+            map.setBounds(bounds, 100);
+        }
+
+        // 카카오맵 스크립트 동적 로드
+        function loadKakaoMapScript() {
+            return new Promise((resolve, reject) => {
+                // 이미 로드되어 있는지 확인
+                if (typeof kakao !== 'undefined' && kakao.maps) {
+                    resolve();
+                    return;
+                }
+
+                // 현재 도메인 확인
+                const currentUrl = window.location.origin;
+                console.log('현재 접속 URL:', currentUrl);
+
+                // 스크립트 태그 생성
+                const script = document.createElement('script');
+                script.type = 'text/javascript';
+                // 프로토콜 명시적으로 지정
+                const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+                // 캐시 방지를 위한 타임스탬프 추가
+                const timestamp = new Date().getTime();
+                script.src = `${protocol}//dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_API_KEY}&autoload=false&t=${timestamp}`;
+                script.async = true;
+                
+                script.onload = () => {
+                    // 카카오맵 API 초기화 (autoload=false 사용 시)
+                    if (typeof kakao !== 'undefined' && kakao.maps && kakao.maps.load) {
+                        kakao.maps.load(() => {
+                            console.log('카카오맵 API 로드 성공');
+                            resolve();
+                        });
+                    } else {
+                        // autoload=true인 경우 약간의 지연 후 확인
+                        setTimeout(() => {
+                            if (typeof kakao !== 'undefined' && kakao.maps && kakao.maps.LatLng) {
+                                console.log('카카오맵 API 로드 성공');
+                                resolve();
+                            } else {
+                                reject(new Error('카카오맵 API 객체를 찾을 수 없습니다.'));
+                            }
+                        }, 500);
+                    }
+                };
+                
+                script.onerror = (error) => {
+                    console.error('카카오맵 스크립트 로드 실패:', error);
+                    console.error('현재 도메인:', currentUrl);
+                    console.error('API 키:', KAKAO_API_KEY);
+                    
+                    reject(new Error(`카카오맵 스크립트를 로드할 수 없습니다.\n\n현재 도메인: ${currentUrl}\n\n카카오 개발자 콘솔에서 다음을 확인하세요:\n1. 플랫폼 설정에 "${currentUrl}" 정확히 등록\n2. 포트 번호 포함하여 등록 (예: http://localhost:5500)\n3. 저장 버튼 클릭 확인\n4. 저장 후 10-15분 대기\n5. 브라우저 캐시 삭제 후 재시도`));
+                };
+                
+                document.head.appendChild(script);
+            });
+        }
+
+        // 카카오맵 초기화
+        window.onload = async function() {
+            try {
+                console.log('카카오맵 초기화 시작...');
+                console.log('현재 URL:', window.location.href);
+                console.log('Origin:', window.location.origin);
+                
+                await loadKakaoMapScript();
+                console.log('카카오맵 스크립트 로드 완료');
+                
+                initMap();
+                console.log('지도 초기화 완료');
+            } catch (error) {
+                console.error('카카오맵 초기화 실패:', error);
+                const currentUrl = window.location.origin;
+                
+                // 상세한 에러 정보를 콘솔에 출력
+                console.error('=== 카카오맵 로드 실패 상세 정보 ===');
+                console.error('에러 메시지:', error.message);
+                console.error('현재 도메인:', currentUrl);
+                console.error('전체 URL:', window.location.href);
+                console.error('프로토콜:', window.location.protocol);
+                console.error('호스트:', window.location.host);
+                
+                // 사용자에게 친절한 안내
+                const userMsg = `카카오맵을 불러올 수 없습니다.
+
+현재 도메인: ${currentUrl}
+
+가능한 원인:
+1. 브라우저 캐시 문제
+   → Ctrl+Shift+R (강력 새로고침)
+   → 또는 개발자 도구(F12) > Network 탭 > "Disable cache" 체크
+
+2. 플랫폼 설정 문제
+   → 카카오 개발자 콘솔 확인 필요
+   → https://developers.kakao.com
+   → 내 애플리케이션 > 앱 설정 > 플랫폼
+   → "${currentUrl}" 정확히 등록되어 있는지 확인
+
+3. 포트 번호 포함 등록
+   → http://localhost:5500
+   → http://127.0.0.1:5500
+   → 둘 다 등록되어 있는지 확인
+
+4. 설정 변경 후 대기 시간
+   → 저장 후 10-15분 대기 필요
+
+개발자 도구(F12) > Console 탭에서 더 자세한 정보를 확인하세요.`;
+                
+                alert(userMsg);
+            }
+        };
+
+        function initMap() {
+            const container = document.getElementById('map');
+            
+            // 매물 데이터 로드 (저장된 데이터가 있으면 불러오고, 없으면 예시 데이터 사용)
+            loadProperties();
+            if (propertyData.length === 0) {
+                propertyData = sampleProperties;
+            }
+            
+            // 부산 전체를 보기 위한 bounds 계산
+            const bounds = new kakao.maps.LatLngBounds();
+            propertyData.forEach(property => {
+                bounds.extend(new kakao.maps.LatLng(property.lat, property.lng));
+            });
+            
+            // bounds의 중심점 계산
+            const sw = bounds.getSouthWest(); // 남서쪽 좌표
+            const ne = bounds.getNorthEast(); // 북동쪽 좌표
+            const centerLat = (sw.getLat() + ne.getLat()) / 2;
+            const centerLng = (sw.getLng() + ne.getLng()) / 2;
+            
+            // 지도 초기화
+            const options = {
+                center: new kakao.maps.LatLng(centerLat, centerLng),
+                level: 6 // 적절한 줌 레벨
+            };
+            map = new kakao.maps.Map(container, options);
+            
+            // 모든 매물이 보이도록 bounds 설정 (패딩 추가)
+            map.setBounds(bounds, 100); // 100px 패딩
+            
+            // 지역별 매물 그룹화
+            const regionGroups = groupByRegion(propertyData);
+            
+            // 사이드바에 지역 목록 표시
+            renderRegionList(regionGroups);
+            
+            // 지역 필터 select 박스에 옵션 추가
+            renderRegionFilter(regionGroups);
+            
+            // 필터링된 매물 초기화
+            filteredProperties = propertyData;
+            
+            // 전체 매물 표시
+            displayProperties(propertyData);
+            
+            // 구별 동그라미 표시
+            displayRegionCircles(regionGroups);
+            
+            // 매물 리스트 렌더링
+            renderPropertyList(propertyData);
+            
+            // 모바일에서 사이드바 토글 기능
+            setupMobileSidebar();
+        }
+        
+        // 지역 필터 select 박스 렌더링
+        function renderRegionFilter(regionGroups) {
+            const regionFilter = document.getElementById('regionFilter');
+            if (!regionFilter) return;
+            
+            // 기존 옵션 제거 (전체 제외)
+            while (regionFilter.children.length > 1) {
+                regionFilter.removeChild(regionFilter.lastChild);
+            }
+            
+            // 지역 옵션 추가
+            Object.keys(regionGroups).forEach(region => {
+                const option = document.createElement('option');
+                option.value = region;
+                option.textContent = region;
+                regionFilter.appendChild(option);
+            });
+            
+            // onchange 이벤트 리스너 추가 (동적으로 생성된 요소에)
+            regionFilter.onchange = function() {
+                applyFilters();
+            };
+        }
+        
+        // 모바일 사이드바 토글 기능
+        function setupMobileSidebar() {
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const mapDiv = document.getElementById('map');
+                
+                // 사이드바 헤더 클릭 시 토글
+                const sidebarHeader = sidebar.querySelector('h2');
+                sidebarHeader.style.cursor = 'pointer';
+                sidebarHeader.addEventListener('click', () => {
+                    sidebar.classList.toggle('open');
+                });
+            }
+        }
+
+        // 지역별로 매물 그룹화
+        function groupByRegion(properties) {
+            const groups = {};
+            properties.forEach(property => {
+                if (!groups[property.region]) {
+                    groups[property.region] = [];
+                }
+                groups[property.region].push(property);
+            });
+            return groups;
+        }
+
+        // 사이드바에 지역 목록 렌더링
+        function renderRegionList(regionGroups) {
+            const regionList = document.getElementById('regionList');
+            regionList.innerHTML = '';
+
+            Object.keys(regionGroups).forEach(region => {
+                const count = regionGroups[region].length;
+                const li = document.createElement('li');
+                li.className = 'region-item';
+                li.textContent = region;
+                li.innerHTML = `${region} <span class="property-count">(${count}건)</span>`;
+                li.onclick = () => filterByRegion(region, regionGroups[region]);
+                regionList.appendChild(li);
+            });
+
+            // 전체 보기 추가
+            const allLi = document.createElement('li');
+            allLi.className = 'region-item active';
+            allLi.innerHTML = `전체 <span class="property-count">(${propertyData.length}건)</span>`;
+            allLi.setAttribute('data-region', 'all'); // 전체 식별용 속성 추가
+            allLi.onclick = () => filterByRegion(null, propertyData);
+            regionList.insertBefore(allLi, regionList.firstChild);
+        }
+
+        // 지역별 필터링
+        function filterByRegion(region, properties) {
+            currentRegion = region;
+            
+            // 활성화 상태 업데이트
+            document.querySelectorAll('.region-item').forEach(item => {
+                item.classList.remove('active');
+                // data-region 속성으로 정확히 매칭
+                const itemRegion = item.getAttribute('data-region');
+                if (region === null && itemRegion === 'all') {
+                    item.classList.add('active');
+                } else if (region !== null && itemRegion === region) {
+                    item.classList.add('active');
+                }
+            });
+
+            // 기존 마커 제거
+            clearMarkers();
+
+            // 선택된 지역의 매물만 표시
+            displayProperties(properties);
+            
+            // 구별 동그라미 업데이트
+            const regionGroups = groupByRegion(properties);
+            displayRegionCircles(regionGroups);
+            
+            // 매물 리스트 업데이트
+            renderPropertyList(properties);
+
+            // 지도 중심 이동 (패딩 추가하여 모든 매물이 보이도록)
+            if (properties.length > 0) {
+                const bounds = new kakao.maps.LatLngBounds();
+                properties.forEach(property => {
+                    bounds.extend(new kakao.maps.LatLng(property.lat, property.lng));
+                });
+                map.setBounds(bounds, 100); // 100px 패딩
+            }
+        }
+        
+        // 구별 동그라미 표시
+        function displayRegionCircles(regionGroups) {
+            // 기존 오버레이 제거
+            clearRegionCircles();
+            
+            Object.keys(regionGroups).forEach(region => {
+                const properties = regionGroups[region];
+                const count = properties.length;
+                
+                // 해당 구의 중심 좌표 계산 (매물들의 평균 좌표)
+                let totalLat = 0;
+                let totalLng = 0;
+                properties.forEach(property => {
+                    totalLat += property.lat;
+                    totalLng += property.lng;
+                });
+                const centerLat = totalLat / properties.length;
+                const centerLng = totalLng / properties.length;
+                
+                // 커스텀 오버레이 생성
+                const content = document.createElement('div');
+                content.style.cssText = `
+                    position: relative;
+                    width: 90px;
+                    height: 90px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                `;
+                
+                // 동그라미 배경
+                const circle = document.createElement('div');
+                circle.style.cssText = `
+                    width: 80px;
+                    height: 80px;
+                    border-radius: 50%;
+                    background-color: #1a1a1a;
+                    border: 4px solid #FFE500;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    transition: transform 0.3s;
+                `;
+                
+                // 구 이름
+                const regionName = document.createElement('div');
+                regionName.textContent = region;
+                regionName.style.cssText = `
+                    color: white;
+                    font-weight: bold;
+                    font-size: 11px;
+                    text-align: center;
+                    margin-bottom: 3px;
+                    line-height: 1.2;
+                `;
+                
+                // 물량 개수
+                const countText = document.createElement('div');
+                countText.textContent = count;
+                countText.style.cssText = `
+                    color: #FFE500;
+                    font-weight: bold;
+                    font-size: 18px;
+                `;
+                
+                circle.appendChild(regionName);
+                circle.appendChild(countText);
+                content.appendChild(circle);
+                
+                // 호버 효과
+                content.addEventListener('mouseenter', () => {
+                    circle.style.transform = 'scale(1.15)';
+                    circle.style.boxShadow = '0 6px 16px rgba(0,0,0,0.5)';
+                });
+                content.addEventListener('mouseleave', () => {
+                    circle.style.transform = 'scale(1)';
+                    circle.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+                });
+                
+                // 클릭 이벤트 (해당 구 필터링)
+                content.addEventListener('click', () => {
+                    filterByRegion(region, properties);
+                });
+                
+                // 커스텀 오버레이 생성
+                const overlay = new kakao.maps.CustomOverlay({
+                    position: new kakao.maps.LatLng(centerLat, centerLng),
+                    content: content,
+                    yAnchor: 0.5,
+                    xAnchor: 0.5
+                });
+                
+                overlay.setMap(map);
+                regionOverlays.push(overlay);
+            });
+        }
+        
+        // 구별 동그라미 제거
+        function clearRegionCircles() {
+            regionOverlays.forEach(overlay => {
+                overlay.setMap(null);
+            });
+            regionOverlays = [];
+        }
+        
+        // 매물 리스트 렌더링
+        function renderPropertyList(properties) {
+            const propertyList = document.getElementById('propertyList');
+            propertyList.innerHTML = '';
+            
+            if (properties.length === 0) {
+                propertyList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">매물이 없습니다.</p>';
+                return;
+            }
+            
+            properties.forEach(property => {
+                const card = document.createElement('div');
+                card.className = 'property-card';
+                card.onclick = () => {
+                    // 매물 클릭 시 지도 중심 이동 및 상세 정보 표시
+                    map.setCenter(new kakao.maps.LatLng(property.lat, property.lng));
+                    map.setLevel(3);
+                    showPropertyDetail(property);
+                    
+                    // 카드 활성화
+                    document.querySelectorAll('.property-card').forEach(c => c.classList.remove('active'));
+                    card.classList.add('active');
+                };
+                
+                card.innerHTML = `
+                    <h4>${property.name}</h4>
+                    <div class="price">${property.price}</div>
+                    <div class="info">
+                        <span><strong>지역:</strong> ${property.region}</span><br>
+                        <span><strong>타입:</strong> ${property.type}</span>
+                        <span><strong>면적:</strong> ${property.area}</span>
+                    </div>
+                `;
+                
+                propertyList.appendChild(card);
+            });
+        }
+
+        // 매물 표시
+        function displayProperties(properties) {
+            properties.forEach(property => {
+                const marker = createMarker(property);
+                markers.push(marker);
+            });
+
+            // 마커들이 이미 지도에 표시됨 (createMarker 함수에서 setMap 호출)
+            // 클러스터링이 필요하면 별도 라이브러리 필요
+        }
+
+        // 마커 생성
+        function createMarker(property) {
+            const markerPosition = new kakao.maps.LatLng(property.lat, property.lng);
+            
+            // 커스텀 마커 이미지 (선택사항)
+            const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
+            const imageSize = new kakao.maps.Size(24, 35);
+            const imageOption = { offset: new kakao.maps.Point(12, 35) };
+            const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
+            
+            const marker = new kakao.maps.Marker({
+                position: markerPosition,
+                image: markerImage
+            });
+
+            marker.setMap(map);
+
+            // 마커 클릭 이벤트
+            kakao.maps.event.addListener(marker, 'click', () => {
+                showPropertyDetail(property);
+            });
+
+            return marker;
+        }
+
+        // 매물 상세 정보 표시
+        function showPropertyDetail(property) {
+            const detailDiv = document.getElementById('propertyDetail');
+            const titleDiv = document.getElementById('propertyTitle');
+            const infoDiv = document.getElementById('propertyInfo');
+
+            titleDiv.textContent = property.name;
+            infoDiv.innerHTML = `
+                <p class="price">${property.price}</p>
+                <p><strong>지역:</strong> ${property.region}</p>
+                <p><strong>주소:</strong> ${property.address}</p>
+                <p><strong>타입:</strong> ${property.type}</p>
+                <p><strong>면적:</strong> ${property.area}</p>
+            `;
+
+            detailDiv.classList.add('show');
+
+            // 지도 중심을 해당 매물로 이동
+            map.setCenter(new kakao.maps.LatLng(property.lat, property.lng));
+            map.setLevel(3);
+        }
+
+        // 상세 정보 닫기
+        function closePropertyDetail() {
+            document.getElementById('propertyDetail').classList.remove('show');
+        }
+
+        // 마커 제거
+        function clearMarkers() {
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+        }
+        
+        // 마커와 동그라미 모두 제거
+        function clearAll() {
+            clearMarkers();
+            clearRegionCircles();
+        }
+
+        // 매물 데이터 저장 (로컬스토리지 예시)
+        function saveProperty(property) {
+            propertyData.push(property);
+            localStorage.setItem('properties', JSON.stringify(propertyData));
+            
+            // 지역 목록 업데이트
+            const regionGroups = groupByRegion(propertyData);
+            renderRegionList(regionGroups);
+            
+            // 지도 업데이트
+            clearMarkers();
+            displayProperties(currentRegion ? 
+                regionGroups[currentRegion] : 
+                propertyData
+            );
+        }
+
+        // 매물 데이터 불러오기 (로컬스토리지 예시)
+        function loadProperties() {
+            const saved = localStorage.getItem('properties');
+            if (saved) {
+                propertyData = JSON.parse(saved);
+            }
+        }
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,15 @@
+name = "live-real-estate"
+compatibility_date = "2024-01-01"
+main = "worker.js"
+
+# D1 데이터베이스 설정
+[[d1_databases]]
+binding = "DB"
+database_name = "live-real-estate-db"
+database_id = "139ac0f9-fc33-4c94-b513-b2c849020ed7"
+
+# R2 버킷 설정 (이미지 저장용)
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "live-real-estate-images"
+
