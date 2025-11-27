@@ -2,6 +2,9 @@ name = "live-real-estate"
 compatibility_date = "2024-01-01"
 main = "worker.js"
 
+# 계정 ID (Cloudflare Dashboard > 우측 상단 계정 선택 > Overview에서 확인)
+account_id = "2d03537ab2383e9b707c73190c817901"
+
 # D1 데이터베이스 설정
 [[d1_databases]]
 binding = "DB"
